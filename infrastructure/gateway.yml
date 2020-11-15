@@ -1,24 +1,75 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 Resources:
-  ApiGateway:
+  GreetingApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: Core API
-      FailOnWarnings : true
+      Name: Greeting API
+      Description: API used for Greeting requests
+      FailOnWarnings: true
 
-      LambdaPermission:
-  Type: AWS::Lambda::Permission
-  Properties:
-    Action: lambda:invokeFunction
-    FunctionName: !GetAtt [ApiGateway, Arn]
-    Principal: apigateway.amazonaws.com
-    SourceArn: !Join
-      - ''
-      - - 'arn:aws:execute-api:'
-      - - !Ref 'AWS::Region'
-      - - ':'
-      - - !Ref 'AWS::AccountId'
-      - - ':'
-      - - !Ref 'ApiGateway'
-      - - "/*"
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !GetAtt [ApiGateway, Arn]
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Join
+        - ''
+          - 'arn:aws:execute-api:'
+          - !Ref 'AWS::Region'
+          - ':'
+          - !Ref 'AWS::AccountId'
+          - ':'
+          - !Ref 'ApiGateway'
+          - "/*"
+
+  GreetingApiStage:
+    DependsOn:
+    - ApiGatewayAccount
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiDeployment
+      MethodSettings:
+      - DataTraceEnabled: true
+        HttpMethod: "*"
+        LoggingLevel: INFO
+        ResourcePath: "/*"
+      RestApiId: !Ref GreetingApi
+      StageName: LATEST
+
+  ApiGatewayCloudWatchLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - apigateway.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: ApiGatewayLogsPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:DescribeLogGroups
+            - logs:DescribeLogStreams
+            - logs:PutLogEvents
+            - logs:GetLogEvents
+            - logs:FilterLogEvents
+            Resource: "*"
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+    - GreetingRequest
+    Properties:
+      RestApiId: !Ref GreetingApi
+      StageName: DummyStage
